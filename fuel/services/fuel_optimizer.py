@@ -193,35 +193,55 @@ def plan_fuel_stops(
         ]
 
         if current is None:
+            # We are at the trip start, so use the full starting tank before buying fuel.
             if not reachable:
                 raise RouteInfeasibleError("No fuel station is reachable from the start.")
+
+            # Move to the first reachable station without purchasing fuel.
             target = reachable[0]
             purchase = ZERO
+
         else:
             here = candidates[current]
+
+            # Look ahead for the first reachable station with a cheaper fuel price.
             cheaper = next(
                 (i for i in reachable if candidates[i].price_per_gallon < here.price_per_gallon),
                 None,
             )
+
             if cheaper is not None:
+                # Buy only enough fuel to reach the first cheaper station.
                 target = cheaper
-                needed = (candidates[target].distance_from_start_miles - position) / FUEL_EFFICIENCY_MPG
+                needed = (
+                    candidates[target].distance_from_start_miles - position
+                ) / FUEL_EFFICIENCY_MPG
                 purchase = max(needed - fuel, ZERO)
+
             elif total - position <= MAX_RANGE_MILES:
+                # No cheaper stop is needed because the destination is within tank range.
                 target = None
                 purchase = (total - position) / FUEL_EFFICIENCY_MPG - fuel
+
             elif reachable:
+                # No cheaper station is reachable, so fill up and head to the cheapest reachable option.
                 target = min(
                     reachable,
-                    key=lambda i: (candidates[i].price_per_gallon, -candidates[i].distance_from_start_miles),
+                    key=lambda i: (
+                        candidates[i].price_per_gallon,
+                        -candidates[i].distance_from_start_miles,
+                    ),
                 )
                 purchase = TANK_CAPACITY_GALLONS - fuel
+
             else:
+                # The trip cannot continue because no station is reachable within 500 miles.
                 raise RouteInfeasibleError(
                     f"No fuel station is reachable after mile {position}."
                 )
 
             if purchase > ZERO:
+                # Record the refueling stop and update the fuel currently in the tank.
                 stops.append(
                     FuelStop(
                         station=here,
@@ -231,13 +251,24 @@ def plan_fuel_stops(
                     )
                 )
                 fuel += purchase
+
             if target is None:
+                # We now have enough fuel to reach the destination, so stop planning.
                 break
 
+        # Move the vehicle to the selected next station.
         next_position = candidates[target].distance_from_start_miles
+
+        # Consume fuel based on the miles driven to the next station.
         fuel -= (next_position - position) / FUEL_EFFICIENCY_MPG
+
+        # Update the vehicle's current route position.
         position = next_position
+
+        # Mark the selected station as the current station for the next iteration.
         current = target
+
+        # Sanity-check that fuel remains between 0 and tank capacity.
         _check_tank(fuel)
 
     return FuelPlan(stops=stops)

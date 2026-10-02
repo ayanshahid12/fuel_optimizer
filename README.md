@@ -1,10 +1,9 @@
 # Fuel Route API (assessment)
 
-Django 6.1 + DRF + PostgreSQL scaffolding for a USA fuel-stop route planner.
-Step 1 covers project setup, `FuelStation`, CSV import, Docker, and tests.
-Step 2 adds geocoding and driving directions via OpenRouteService.
-Step 3 geocodes fuel stations and matches them to the route.
-Step 4 chooses cost-optimized fuel stops along the route.
+Django 6.1 + DRF + PostgreSQL API that plans a driving route between two US
+locations and picks cost-effective fuel stops along it (500-mile range, 10 MPG),
+using fuel prices from the provided CSV and OpenRouteService for geocoding and
+directions.
 
 ## Prerequisites
 
@@ -12,7 +11,7 @@ Step 4 chooses cost-optimized fuel stops along the route.
 - Docker Compose
 - An [OpenRouteService API key](https://openrouteservice.org/dev/#/signup)
 
-## Setup
+## Environment setup
 
 ```bash
 cp .env.example .env
@@ -25,7 +24,7 @@ Get a free key at https://openrouteservice.org/dev/#/signup and set:
 ORS_API_KEY=your_key_here
 ```
 
-## Start
+## Start Docker
 
 ```bash
 docker compose up --build
@@ -34,17 +33,37 @@ docker compose up --build
 Django listens on http://localhost:8000. PostgreSQL is the `db` service and
 is only reachable from the Compose network (host `db`, port `5432`).
 
-## Migrate
+## Run migrations
 
 ```bash
 docker compose exec web python manage.py migrate
 ```
 
-## Import fuel prices
+## Load Prepared Assessment Data
 
-The CSV lives at `data/fuel-prices-for-be-assessment.csv` and is available
-inside the container through the project bind mount (it is not baked into the
-image).
+`fuel_optimization_data.sql` is a **data-only** PostgreSQL dump of the
+prepared `fuel_station` rows (prices plus validated coordinates) and
+`location_geocode` rows (cached start/finish geocodes). It is not a schema
+dump, so **run the migrations above first**.
+
+```bash
+docker compose exec db psql -U fuel -d fuel -c \
+"TRUNCATE TABLE fuel_station, location_geocode RESTART IDENTITY CASCADE;"
+
+docker compose exec -T db psql -U fuel -d fuel \
+  < fuel_optimization_data.sql
+```
+
+- `TRUNCATE` removes any existing rows so the load does not fail with
+  duplicate primary-key errors.
+- The dump saves you from re-geocoding thousands of stations, which would cost
+  several days of free-tier OpenRouteService credits.
+- OpenRouteService is still required at request time: for start/finish
+  geocoding when a location is not already cached, and for route directions.
+
+### Alternative: build the data from the CSV
+
+Only needed if you want to regenerate the data instead of loading the dump.
 
 ```bash
 docker compose exec web \
@@ -56,11 +75,14 @@ OPIS Truckstop ID is not unique in the source file, so every valid CSV row is
 stored. Re-running the command replaces all existing fuel station rows with
 the current file contents (deterministic full reload).
 
-## Geocode fuel stations
-
 Station coordinates are filled separately (not during `/api/routes/`) so routing
 stays fast. The command is resumable and deduplicates by `address + city + state`
-so identical locations use one ORS request.
+so identical locations use one ORS request:
+
+```bash
+docker compose exec web \
+  python manage.py geocode_fuel_stations --limit 2800 --delay 0.7
+```
 
 Each request asks for up to 5 candidates. A candidate is accepted only if it is
 in the USA and its state matches the station's `state` (abbreviation or full
@@ -71,33 +93,12 @@ non-US state codes (Canadian provinces in the CSV) are skipped without a request
 
 Every row records a `geocode_status` (`pending`, `valid`, `rejected`,
 `not_found`, `skipped`), so processed addresses are not requested again.
-
-Coordinates stored before validation existed are repaired with `--revalidate`,
-which re-geocodes those addresses, keeps coordinates only when the state
-matches, and clears them otherwise:
-
-```bash
-docker compose exec web \
-  python manage.py geocode_fuel_stations --revalidate --limit 100
-```
+Coordinates stored before validation existed can be repaired with
+`--revalidate`, which keeps coordinates only when the state matches.
 
 ORS geocoding limits on the free tier are roughly **100 requests/minute** and
 **3000/day**. Default `--delay 0.7` stays under the rate limit. Prefer modest
-`--limit` values (for example `2800`) so route requests still have quota left.
-
-```bash
-# 10 unique addresses
-docker compose exec web \
-  python manage.py geocode_fuel_stations --limit 10
-
-# 100 unique addresses
-docker compose exec web \
-  python manage.py geocode_fuel_stations --limit 100 --delay 0.7
-
-# Larger daily batch (leave headroom for routing)
-docker compose exec web \
-  python manage.py geocode_fuel_stations --limit 2800 --delay 0.7
-```
+`--limit` values so route requests still have quota left.
 
 Check how many stations still lack coordinates:
 
@@ -107,12 +108,30 @@ docker compose exec db \
   -c "SELECT count(*) FROM fuel_station WHERE latitude IS NULL OR longitude IS NULL;"
 ```
 
-## Route API
+## Run tests
+
+Tests run against PostgreSQL inside Docker (no SQLite). OpenRouteService HTTP
+calls are mocked; tests do not require a real `ORS_API_KEY`.
+
+```bash
+docker compose exec web python manage.py test
+```
+
+## Use the API
 
 `POST /api/routes/` geocodes the start and finish locations (Pelias on
 `api.heigit.org`), fetches one `driving-car` GeoJSON route from
 OpenRouteService (`https://api.heigit.org/openrouteservice/v2/...`), and
 returns the cheapest fuel stops for the trip.
+
+Request body:
+
+| Field | Type | Description |
+|---|---|---|
+| `start` | string | US start location, e.g. `"New York, NY"` |
+| `finish` | string | US finish location, e.g. `"Chicago, IL"` |
+
+## Example POST /api/routes/ request
 
 ```bash
 curl -X POST http://localhost:8000/api/routes/ \
@@ -182,6 +201,23 @@ returns HTTP 422:
 {"error": {"code": "route_infeasible", "detail": "No fuel station between mile 120.4 and mile 655.1; the 534.7-mile gap exceeds the 500-mile range."}}
 ```
 
+Other errors use the same `{"error": {"code", "detail"}}` shape, for example
+`location_not_found` (404), `ors_timeout` (504) and `ors_request_failed` (502).
+
+## Architecture and assumptions
+
+### Request flow
+
+1. Validate `start` and `finish`.
+2. Resolve both locations from the `location_geocode` cache; cache misses are
+   geocoded by ORS concurrently.
+3. Fetch one driving route from ORS.
+4. Match nearby fuel stations to the route in PostgreSQL + Shapely.
+5. Choose fuel stops with the greedy optimizer.
+
+One request makes at most three ORS calls (two geocodes, one directions call),
+and only the directions call when both locations are cached.
+
 ### Location cache
 
 Start and finish geocodes are cached in PostgreSQL (`location_geocode`), keyed
@@ -189,27 +225,6 @@ by the normalized input (case-folded, whitespace and commas standardized), so a
 repeated location costs no ORS geocoding call. Failed lookups are not cached.
 Cache misses for start and finish are geocoded concurrently; the directions
 request waits for both.
-
-### Fuel-stop optimization
-
-- The vehicle has a 500-mile range at 10 MPG (a 50-gallon tank) and **starts
-  with a full tank**. The cost of that starting fuel is **not included**,
-  because no starting price is known.
-- Candidates are the stations matched to the route (below). The CSV can list
-  the same physical station several times with different prices. Rows sharing
-  OPIS ID, address, city and state become one candidate at the **minimum
-  listed retail price**. Source rows in PostgreSQL are never modified.
-- No leg (start to first stop, stop to stop, last stop to destination) may
-  exceed 500 miles; exactly 500 is allowed.
-- Greedy strategy at each station: if a cheaper station is reachable within
-  500 miles, buy only enough fuel to reach the first one. Otherwise, fill the
-  tank, or buy just enough to finish if the destination is in range. Then
-  continue to the cheapest station in range. No fuel is bought once the
-  destination is reachable.
-- Fuel stays between 0 and 50 gallons. Money uses `Decimal`; each stop's cost
-  is rounded to cents, and `total_fuel_cost` is the sum of stop costs.
-- No routing or geocoding calls are made after the initial route is fetched.
-  Station matching and optimization use only PostgreSQL and local math.
 
 ### Matching stations to the route
 
@@ -224,12 +239,31 @@ of the route, ordered by `distance_from_start_miles`.
 - `distance_from_route_miles` is the shortest distance to the route line.
 - `distance_from_start_miles` is the distance along the route path to the
   point nearest the station (not a straight line from the start).
+- Station positions are clamped to the ORS route distance, because the
+  projected route line can be about 0.5% shorter.
 
-No extra ORS calls are made: one route request is still two geocodes plus one
-directions call. Station positions are clamped to the ORS route distance,
-because the projected route line can be about 0.5% shorter.
+### Fuel-stop optimization
 
-### Data-quality limitations
+- The vehicle has a 500-mile range at 10 MPG (a 50-gallon tank) and **starts
+  with a full tank**. The cost of that starting fuel is **not included**,
+  because no starting price is known.
+- The CSV can list the same physical station several times with different
+  prices. Rows sharing OPIS ID, address, city and state become one candidate at
+  the **minimum listed retail price**. Source rows in PostgreSQL are never
+  modified.
+- No leg (start to first stop, stop to stop, last stop to destination) may
+  exceed 500 miles; exactly 500 is allowed.
+- Greedy strategy at each station: if a cheaper station is reachable within
+  500 miles, buy only enough fuel to reach the first one. Otherwise, fill the
+  tank, or buy just enough to finish if the destination is in range. Then
+  continue to the cheapest station in range. No fuel is bought once the
+  destination is reachable.
+- Fuel stays between 0 and 50 gallons. Money uses `Decimal`; each stop's cost
+  is rounded to cents, and `total_fuel_cost` is the sum of stop costs.
+- No routing or geocoding calls are made after the initial route is fetched.
+  Station matching and optimization use only PostgreSQL and local math.
+
+## Known limitations
 
 - Station coordinates come from ORS geocoding of the CSV address text, which is
   often a highway exit (e.g. `I-80, EXIT 223`). A geocode is accepted only if
@@ -240,23 +274,23 @@ because the projected route line can be about 0.5% shorter.
 - Stations whose address could not be resolved in the correct state
   (`rejected`, `not_found`) or that are outside the USA (`skipped`, the
   Canadian rows in the CSV) have no coordinates and are never used. With the
-  current dataset, 6,717 of 8,151 rows are usable.
+  prepared dataset, 6,717 of 8,151 rows are usable.
 - Geocodes are not refreshed automatically; re-running geocoding costs ORS
   quota.
 - Distances along the route are measured to each station's nearest point on
   the route; the detour from the highway to the station (up to 10 miles) is not
   added to fuel use.
+- The optimizer minimizes fuel cost only; it does not account for the number
+  of stops, so a plan can include small top-ups.
 
-## Stop
+## Stop and reset
 
 ```bash
 docker compose down
 ```
 
 Database data is kept in the named volume `postgres_data` across normal
-`down` / `up` cycles.
-
-## Reset the database
+`down` / `up` cycles. To start from an empty database:
 
 ```bash
 docker compose down -v
@@ -264,4 +298,4 @@ docker compose up --build
 docker compose exec web python manage.py migrate
 ```
 
-`-v` deletes the Postgres volume. Recreate schema and re-import data afterward.
+`-v` deletes the Postgres volume; reload the prepared data afterwards.

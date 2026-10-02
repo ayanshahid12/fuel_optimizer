@@ -182,6 +182,14 @@ returns HTTP 422:
 {"error": {"code": "route_infeasible", "detail": "No fuel station between mile 120.4 and mile 655.1; the 534.7-mile gap exceeds the 500-mile range."}}
 ```
 
+### Location cache
+
+Start and finish geocodes are cached in PostgreSQL (`location_geocode`), keyed
+by the normalized input (case-folded, whitespace and commas standardized), so a
+repeated location costs no ORS geocoding call. Failed lookups are not cached.
+Cache misses for start and finish are geocoded concurrently; the directions
+request waits for both.
+
 ### Fuel-stop optimization
 
 - The vehicle has a 500-mile range at 10 MPG (a 50-gallon tank) and **starts

@@ -75,3 +75,21 @@ class FuelStation(models.Model):
     @property
     def has_coordinates(self) -> bool:
         return self.latitude is not None and self.longitude is not None
+
+
+class LocationGeocode(models.Model):
+    """Cached ORS geocode for a user-entered route location (successful lookups only)."""
+
+    normalized_query = models.CharField(max_length=255, unique=True)
+    query = models.CharField(max_length=255)
+    label = models.CharField(max_length=500)
+    latitude = models.FloatField(validators=[MinValueValidator(-90), MaxValueValidator(90)])
+    longitude = models.FloatField(validators=[MinValueValidator(-180), MaxValueValidator(180)])
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "location_geocode"
+
+    def __str__(self) -> str:
+        return f"{self.normalized_query} -> ({self.latitude}, {self.longitude})"

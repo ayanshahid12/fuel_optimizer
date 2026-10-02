@@ -104,7 +104,6 @@ REST_FRAMEWORK = {
     ],
     "EXCEPTION_HANDLER": "fuel.exceptions.api_exception_handler",
 }
-
 # OpenRouteService — optional at process start so tests can assert a missing key cleanly.
 ORS_API_KEY = os.environ.get("ORS_API_KEY", "").strip()
 ORS_BASE_URL = os.environ.get("ORS_BASE_URL", "https://api.heigit.org").rstrip("/")

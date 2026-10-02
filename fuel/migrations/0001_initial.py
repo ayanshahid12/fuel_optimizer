@@ -37,4 +37,20 @@ class Migration(migrations.Migration):
                 'constraints': [models.CheckConstraint(condition=models.Q(('retail_price__gt', 0)), name='fuel_station_retail_price_positive')],
             },
         ),
+        migrations.CreateModel(
+            name='LocationGeocode',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('normalized_query', models.CharField(max_length=255, unique=True)),
+                ('query', models.CharField(max_length=255)),
+                ('label', models.CharField(max_length=500)),
+                ('latitude', models.FloatField(validators=[django.core.validators.MinValueValidator(-90), django.core.validators.MaxValueValidator(90)])),
+                ('longitude', models.FloatField(validators=[django.core.validators.MinValueValidator(-180), django.core.validators.MaxValueValidator(180)])),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+            ],
+            options={
+                'db_table': 'location_geocode',
+            },
+        ),
     ]

@@ -204,6 +204,349 @@ returns HTTP 422:
 Other errors use the same `{"error": {"code", "detail"}}` shape, for example
 `location_not_found` (404), `ors_timeout` (504) and `ors_request_failed` (502).
 
+### More example routes
+
+Real responses using the prepared data. `start`, `finish` and `route` are
+omitted below for brevity.
+
+**New York → Philadelphia (under 500 miles, no stops needed)**
+
+```json
+{
+  "start": "350 5th Ave, New York, NY 10118",
+  "finish": "1 Liberty Plaza, Philadelphia, PA 19106"
+}
+```
+
+<details>
+<summary>Response</summary>
+
+```json
+{
+  "vehicle": {
+    "maximum_range_miles": 500,
+    "fuel_efficiency_mpg": 10,
+    "tank_capacity_gallons": 50,
+    "starting_tank": "full"
+  },
+  "fuel_stops": [],
+  "total_fuel_purchased_gallons": "0.00",
+  "total_fuel_cost": "0.00"
+}
+```
+
+</details>
+
+**New York → Atlanta (3 stops)**
+
+```json
+{
+  "start": "350 5th Ave, New York, NY 10118",
+  "finish": "600 Peachtree St NE, Atlanta, GA 30308"
+}
+```
+
+<details>
+<summary>Response</summary>
+
+```json
+{
+  "vehicle": {
+    "maximum_range_miles": 500,
+    "fuel_efficiency_mpg": 10,
+    "tank_capacity_gallons": 50,
+    "starting_tank": "full"
+  },
+  "fuel_stops": [
+    {
+      "opis_truckstop_id": 63516,
+      "truckstop_name": "SHEETZ #701",
+      "address": "I-81, EXIT 273",
+      "city": "Mount Jackson",
+      "state": "VA",
+      "latitude": 38.743242,
+      "longitude": -78.646498,
+      "price_per_gallon": "2.874",
+      "distance_from_start_miles": 326.71,
+      "distance_from_route_miles": 0.27,
+      "gallons_purchased": "5.38",
+      "fuel_cost": "15.46"
+    },
+    {
+      "opis_truckstop_id": 72706,
+      "truckstop_name": "Sheetz #790",
+      "address": "I-77 EXIT 100",
+      "city": "Mount Airy",
+      "state": "NC",
+      "latitude": 36.515677,
+      "longitude": -80.613607,
+      "price_per_gallon": "2.859",
+      "distance_from_start_miles": 553.79,
+      "distance_from_route_miles": 7.08,
+      "gallons_purchased": "5.28",
+      "fuel_cost": "15.11"
+    },
+    {
+      "opis_truckstop_id": 69964,
+      "truckstop_name": "SHEETZ #621",
+      "address": "I-77 & US-70, Exit 49A",
+      "city": "Statesville",
+      "state": "NC",
+      "latitude": 35.784718,
+      "longitude": -80.885975,
+      "price_per_gallon": "2.849",
+      "distance_from_start_miles": 606.63,
+      "distance_from_route_miles": 1.25,
+      "gallons_purchased": "27.45",
+      "fuel_cost": "78.21"
+    }
+  ],
+  "total_fuel_purchased_gallons": "38.11",
+  "total_fuel_cost": "108.78"
+}
+```
+
+</details>
+
+**New York → Los Angeles (cross-country, 15 stops)**
+
+```json
+{
+  "start": "350 5th Ave, New York, NY 10118",
+  "finish": "200 N Spring St, Los Angeles, CA 90012"
+}
+```
+
+<details>
+<summary>Response</summary>
+
+```json
+{
+  "vehicle": {
+    "maximum_range_miles": 500,
+    "fuel_efficiency_mpg": 10,
+    "tank_capacity_gallons": 50,
+    "starting_tank": "full"
+  },
+  "fuel_stops": [
+    {
+      "opis_truckstop_id": 72445,
+      "truckstop_name": "SHEETZ #639",
+      "address": "I-80 Exit 223",
+      "city": "Youngstown",
+      "state": "OH",
+      "latitude": 41.098763,
+      "longitude": -80.652215,
+      "price_per_gallon": "3.059",
+      "distance_from_start_miles": 390.11,
+      "distance_from_route_miles": 3.7,
+      "gallons_purchased": "5.41",
+      "fuel_cost": "16.55"
+    },
+    {
+      "opis_truckstop_id": 72288,
+      "truckstop_name": "S&G #88",
+      "address": "I-475 Exit 13 & US-20",
+      "city": "Toledo",
+      "state": "OH",
+      "latitude": 41.673729,
+      "longitude": -83.563577,
+      "price_per_gallon": "3.009",
+      "distance_from_start_miles": 554.09,
+      "distance_from_route_miles": 6.77,
+      "gallons_purchased": "29.24",
+      "fuel_cost": "87.97"
+    },
+    {
+      "opis_truckstop_id": 70744,
+      "truckstop_name": "CASEYS #3686",
+      "address": "I-80 EXIT 81",
+      "city": "Utica",
+      "state": "IL",
+      "latitude": 41.343877,
+      "longitude": -88.966788,
+      "price_per_gallon": "2.969",
+      "distance_from_start_miles": 846.45,
+      "distance_from_route_miles": 1.68,
+      "gallons_purchased": "24.51",
+      "fuel_cost": "72.77"
+    },
+    {
+      "opis_truckstop_id": 70333,
+      "truckstop_name": "KWIK STAR #932",
+      "address": "I-80, EXIT 143 & CR-S14",
+      "city": "Altoona",
+      "state": "IA",
+      "latitude": 41.64968,
+      "longitude": -93.469235,
+      "price_per_gallon": "2.959",
+      "distance_from_start_miles": 1091.55,
+      "distance_from_route_miles": 1.04,
+      "gallons_purchased": "14.47",
+      "fuel_cost": "42.82"
+    },
+    {
+      "opis_truckstop_id": 70467,
+      "truckstop_name": "QUIKTRIP #598",
+      "address": "I-80, EXIT 439, SR-370",
+      "city": "Omaha",
+      "state": "NE",
+      "latitude": 41.261377,
+      "longitude": -95.989632,
+      "price_per_gallon": "2.92733333",
+      "distance_from_start_miles": 1236.26,
+      "distance_from_route_miles": 2.65,
+      "gallons_purchased": "1.61",
+      "fuel_cost": "4.71"
+    },
+    {
+      "opis_truckstop_id": 69840,
+      "truckstop_name": "KUM & GO #0370",
+      "address": "I-80, EXIT 439 & SR-370",
+      "city": "Gretna",
+      "state": "NE",
+      "latitude": 41.145514,
+      "longitude": -96.236859,
+      "price_per_gallon": "2.92066666",
+      "distance_from_start_miles": 1252.35,
+      "distance_from_route_miles": 2.19,
+      "gallons_purchased": "7.27",
+      "fuel_cost": "21.23"
+    },
+    {
+      "opis_truckstop_id": 68368,
+      "truckstop_name": "AKAL TRAVEL CENTER",
+      "address": "I-80 EX 360",
+      "city": "Waco",
+      "state": "NE",
+      "latitude": 40.916001,
+      "longitude": -97.415821,
+      "price_per_gallon": "2.799",
+      "distance_from_start_miles": 1325.04,
+      "distance_from_route_miles": 6.59,
+      "gallons_purchased": "50.00",
+      "fuel_cost": "139.95"
+    },
+    {
+      "opis_truckstop_id": 65287,
+      "truckstop_name": "AM ENERGY",
+      "address": "I-80, EXIT 248",
+      "city": "Overton",
+      "state": "NE",
+      "latitude": 40.791199,
+      "longitude": -99.489036,
+      "price_per_gallon": "2.899",
+      "distance_from_start_miles": 1435.19,
+      "distance_from_route_miles": 6.8,
+      "gallons_purchased": "11.02",
+      "fuel_cost": "31.93"
+    },
+    {
+      "opis_truckstop_id": 72599,
+      "truckstop_name": "FATDOGS LEXINGTON",
+      "address": "US-283",
+      "city": "Lexington",
+      "state": "NE",
+      "latitude": 40.780359,
+      "longitude": -99.742437,
+      "price_per_gallon": "2.979",
+      "distance_from_start_miles": 1449.9,
+      "distance_from_route_miles": 2.53,
+      "gallons_purchased": "1.47",
+      "fuel_cost": "4.38"
+    },
+    {
+      "opis_truckstop_id": 69085,
+      "truckstop_name": "FATDOGS OGALLALA",
+      "address": "US-80, EXIT 126 & US-26/SR-61",
+      "city": "Ogallala",
+      "state": "NE",
+      "latitude": 41.129278,
+      "longitude": -101.722911,
+      "price_per_gallon": "3.014",
+      "distance_from_start_miles": 1559.04,
+      "distance_from_route_miles": 0.97,
+      "gallons_purchased": "10.91",
+      "fuel_cost": "32.89"
+    },
+    {
+      "opis_truckstop_id": 20009,
+      "truckstop_name": "BIG SPRINGS TRUCK AND TRAVEL",
+      "address": "I-80, EXIT 107",
+      "city": "Big Springs",
+      "state": "NE",
+      "latitude": 41.11193,
+      "longitude": -102.147114,
+      "price_per_gallon": "3.074",
+      "distance_from_start_miles": 1580.77,
+      "distance_from_route_miles": 5.27,
+      "gallons_purchased": "2.17",
+      "fuel_cost": "6.68"
+    },
+    {
+      "opis_truckstop_id": 73101,
+      "truckstop_name": "7-ELEVEN 42279",
+      "address": "I-76, Exit 39",
+      "city": "Keenesburg",
+      "state": "CO",
+      "latitude": 40.109822,
+      "longitude": -104.51528,
+      "price_per_gallon": "3.149",
+      "distance_from_start_miles": 1729.22,
+      "distance_from_route_miles": 0.41,
+      "gallons_purchased": "14.85",
+      "fuel_cost": "46.75"
+    },
+    {
+      "opis_truckstop_id": 60700,
+      "truckstop_name": "PWI #502",
+      "address": "I-70/US-40, EXIT 259",
+      "city": "Golden",
+      "state": "CO",
+      "latitude": 39.738197,
+      "longitude": -105.208243,
+      "price_per_gallon": "3.199",
+      "distance_from_start_miles": 1776.63,
+      "distance_from_route_miles": 1.66,
+      "gallons_purchased": "4.74",
+      "fuel_cost": "15.17"
+    },
+    {
+      "opis_truckstop_id": 70793,
+      "truckstop_name": "LOVES TRAVEL STOPS #119",
+      "address": "I-70, EXIT 160",
+      "city": "Green River",
+      "state": "UT",
+      "latitude": 38.991788,
+      "longitude": -110.11284,
+      "price_per_gallon": "3.299",
+      "distance_from_start_miles": 2103.64,
+      "distance_from_route_miles": 1.13,
+      "gallons_purchased": "22.68",
+      "fuel_cost": "74.81"
+    },
+    {
+      "opis_truckstop_id": 72965,
+      "truckstop_name": "Maverik #674",
+      "address": "I-15, Exit 45",
+      "city": "North Las Vegas",
+      "state": "NV",
+      "latitude": 36.299987,
+      "longitude": -115.136038,
+      "price_per_gallon": "3.28233333",
+      "distance_from_start_miles": 2503.4,
+      "distance_from_route_miles": 4.24,
+      "gallons_purchased": "28.80",
+      "fuel_cost": "94.54"
+    }
+  ],
+  "total_fuel_purchased_gallons": "229.15",
+  "total_fuel_cost": "693.15"
+}
+```
+
+</details>
+
 ## Architecture and assumptions
 
 ### Request flow

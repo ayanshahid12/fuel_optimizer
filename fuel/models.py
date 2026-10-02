@@ -15,6 +15,13 @@ class FuelStation(models.Model):
     different names and prices. Each CSV row is stored as its own record.
     """
 
+    class GeocodeStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        VALID = "valid", "Valid"
+        REJECTED = "rejected", "Rejected"
+        NOT_FOUND = "not_found", "Not found"
+        SKIPPED = "skipped", "Skipped"
+
     opis_truckstop_id = models.PositiveIntegerField()
     truckstop_name = models.CharField(max_length=255)
     address = models.CharField(max_length=255)
@@ -38,6 +45,11 @@ class FuelStation(models.Model):
         null=True,
         blank=True,
         validators=[MinValueValidator(-180), MaxValueValidator(180)],
+    )
+    geocode_status = models.CharField(
+        max_length=16,
+        choices=GeocodeStatus.choices,
+        default=GeocodeStatus.PENDING,
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

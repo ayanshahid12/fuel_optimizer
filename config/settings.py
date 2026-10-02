@@ -110,3 +110,8 @@ ORS_API_KEY = os.environ.get("ORS_API_KEY", "").strip()
 ORS_BASE_URL = os.environ.get("ORS_BASE_URL", "https://api.heigit.org").rstrip("/")
 ORS_TIMEOUT_SECONDS = float(os.environ.get("ORS_TIMEOUT_SECONDS", "15"))
 METERS_PER_MILE = 1609.344
+
+NEARBY_STATION_MAX_DISTANCE_MILES = float(os.environ.get("NEARBY_STATION_MAX_DISTANCE_MILES", "10"))
+NEARBY_STATION_BBOX_MARGIN_MILES = float(
+    os.environ.get("NEARBY_STATION_BBOX_MARGIN_MILES", str(NEARBY_STATION_MAX_DISTANCE_MILES))
+)

@@ -26,6 +26,7 @@ class Migration(migrations.Migration):
                 ('retail_price', models.DecimalField(decimal_places=8, max_digits=12, validators=[django.core.validators.MinValueValidator(Decimal('0.01'))])),
                 ('latitude', models.FloatField(blank=True, null=True, validators=[django.core.validators.MinValueValidator(-90), django.core.validators.MaxValueValidator(90)])),
                 ('longitude', models.FloatField(blank=True, null=True, validators=[django.core.validators.MinValueValidator(-180), django.core.validators.MaxValueValidator(180)])),
+                ('geocode_status', models.CharField(choices=[('pending', 'Pending'), ('valid', 'Valid'), ('rejected', 'Rejected'), ('not_found', 'Not found'), ('skipped', 'Skipped')], default='pending', max_length=16)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
             ],

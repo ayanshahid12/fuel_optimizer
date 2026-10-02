@@ -45,6 +45,11 @@ class OrsResponseError(AppError):
     code = "ors_response_invalid"
 
 
+class RouteInfeasibleError(AppError):
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    code = "route_infeasible"
+
+
 def api_exception_handler(exc, context):
     if isinstance(exc, AppError):
         return Response(

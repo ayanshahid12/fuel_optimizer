@@ -42,6 +42,21 @@ class GeocodedLocation:
 
 
 @dataclass(frozen=True)
+class GeocodeCandidate:
+    """One Pelias search result with the administrative fields used for validation."""
+
+    label: str
+    latitude: float
+    longitude: float
+    country: str
+    country_code: str
+    region: str
+    region_code: str
+    locality: str
+    layer: str
+
+
+@dataclass(frozen=True)
 class RouteResult:
     distance_meters: float
     distance_miles: float
@@ -116,6 +131,57 @@ class OpenRouteServiceClient:
             longitude=longitude,
         )
 
+    def search_candidates(self, text: str, *, size: int = 5) -> list[GeocodeCandidate]:
+        """Return up to ``size`` geocoding candidates; an empty list means no match.
+
+        Malformed features are skipped. One call is one ORS request regardless of ``size``.
+        """
+        self._require_api_key()
+        payload = self._request(
+            "GET",
+            self.geocode_url,
+            params={
+                "text": text,
+                "size": size,
+                "boundary.country": "US",
+            },
+            accept="application/json",
+        )
+        features = payload.get("features")
+        if not isinstance(features, list):
+            raise OrsResponseError("Geocoding response from OpenRouteService was malformed.")
+
+        candidates: list[GeocodeCandidate] = []
+        for feature in features:
+            try:
+                coordinates = feature["geometry"]["coordinates"]
+                longitude, latitude = float(coordinates[0]), float(coordinates[1])
+                properties = feature.get("properties") or {}
+            except (KeyError, TypeError, ValueError, IndexError):
+                continue
+
+            def text_prop(*keys: str) -> str:
+                for key in keys:
+                    value = properties.get(key)
+                    if value:
+                        return str(value)
+                return ""
+
+            candidates.append(
+                GeocodeCandidate(
+                    label=text_prop("label") or text,
+                    latitude=latitude,
+                    longitude=longitude,
+                    country=text_prop("country"),
+                    country_code=text_prop("country_a", "country_code"),
+                    region=text_prop("region"),
+                    region_code=text_prop("region_a"),
+                    locality=text_prop("locality", "localadmin"),
+                    layer=text_prop("layer"),
+                )
+            )
+        return candidates
+
     def get_route(self, start: GeocodedLocation, finish: GeocodedLocation) -> RouteResult:
         self._require_api_key()
         payload = self._request(
@@ -141,16 +207,6 @@ class OpenRouteServiceClient:
             duration_seconds=duration_seconds,
             geometry=geometry,
         )
-
-    def create_route(self, start: str, finish: str) -> dict[str, Any]:
-        start_location = self.geocode(start, role="start")
-        finish_location = self.geocode(finish, role="finish")
-        route = self.get_route(start_location, finish_location)
-        return {
-            "start": start_location.to_dict(),
-            "finish": finish_location.to_dict(),
-            "route": route.to_dict(),
-        }
 
     def _require_api_key(self) -> None:
         if not self.api_key:

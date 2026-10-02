@@ -1,0 +1,6 @@
+Django>=6.1,<6.2
+djangorestframework>=3.18,<3.19
+psycopg[binary]
+httpx
+shapely>=2.1,<3
+numpy
